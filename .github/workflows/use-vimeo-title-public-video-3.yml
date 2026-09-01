@@ -1,0 +1,47 @@
+name: Use Vimeo title for public video 3
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/use-vimeo-title-public-video-3.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update-title:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replace placeholder with live Vimeo title
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('education-public-sector/index.html')
+          text = p.read_text()
+
+          old_iframe = '<iframe src="https://player.vimeo.com/video/769314108" title="MLA and BC NDP public affairs video example 3" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen style="border:0;border-radius:22px;"></iframe>'
+          new_iframe = '<iframe id="public-video-3" src="https://player.vimeo.com/video/769314108" title="MLA and BC NDP public affairs video example 3" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen style="border:0;border-radius:22px;"></iframe>'
+          old_title = '<h3 class="section-title" style="font-size:clamp(2rem,3.5vw,3.4rem)">Selected Public Affairs Video 03</h3>'
+          new_title = '<h3 id="public-title-3" class="section-title" style="font-size:clamp(2rem,3.5vw,3.4rem)">Video title loading…</h3>'
+          old_scripts = '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script></body></html>'
+          new_scripts = '<script src="https://player.vimeo.com/api/player.js"></script><script>(function(){var iframe=document.getElementById("public-video-3");var title=document.getElementById("public-title-3");if(!iframe||!title||!window.Vimeo)return;var player=new Vimeo.Player(iframe);player.getVideoTitle().then(function(videoTitle){if(videoTitle)title.textContent=videoTitle;}).catch(function(){title.textContent="Public Affairs & Political Communications";});})();</script><script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script></body></html>'
+
+          assert old_iframe in text, 'Expected Vimeo 769314108 iframe was not found'
+          assert old_title in text, 'Expected Selected Public Affairs Video 03 title was not found'
+          assert old_scripts in text, 'Expected closing script block was not found'
+
+          text = text.replace(old_iframe, new_iframe, 1)
+          text = text.replace(old_title, new_title, 1)
+          text = text.replace(old_scripts, new_scripts, 1)
+          p.write_text(text)
+          PY
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add education-public-sector/index.html
+          git commit -m "Use actual Vimeo title for public affairs video 3"
+          git push
