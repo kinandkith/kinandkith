@@ -1,0 +1,71 @@
+name: Update construction video titles
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/update-construction-video-titles.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update-titles:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch Vimeo titles and update construction portfolio
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json, urllib.parse, urllib.request, re
+
+          ids = ['478678831','547668764','547662558','527985442','523002550']
+          titles = {}
+          for vid in ids:
+              url = 'https://vimeo.com/api/oembed.json?' + urllib.parse.urlencode({'url': f'https://vimeo.com/{vid}'})
+              with urllib.request.urlopen(url, timeout=20) as r:
+                  data = json.load(r)
+              title = data.get('title','').strip()
+              if not title:
+                  raise SystemExit(f'No Vimeo title returned for {vid}')
+              titles[vid] = title
+              print(vid, title)
+
+          p = Path('construction-projects/index.html')
+          text = p.read_text()
+
+          olds = [
+              'Construction Project Story 01',
+              'Construction Project Story 02',
+              'Construction Project Story 03',
+              'Construction Project Story 04',
+              'Construction Project Story 05',
+          ]
+
+          for vid, old in zip(ids, olds):
+              new = titles[vid]
+              # Handle Story 03's id attribute as well as the standard headings.
+              if old == 'Construction Project Story 03':
+                  pattern = r'(<h3 id="construction-story-03-title" class="section-title" style="font-size:clamp\(2rem,3\.5vw,3\.4rem\)">)' + re.escape(old) + r'(</h3>)'
+              else:
+                  pattern = r'(<h3 class="section-title" style="font-size:clamp\(2rem,3\.5vw,3\.4rem\)">)' + re.escape(old) + r'(</h3>)'
+              text, n = re.subn(pattern, lambda m: m.group(1)+new+m.group(2), text, count=1)
+              if n != 1:
+                  raise SystemExit(f'Could not replace title for {vid}: {old}')
+
+          # Remove the old runtime title loader now that every Vimeo title is static.
+          text = text.replace('<script src="https://player.vimeo.com/api/player.js"></script><script>(function(){var iframe=document.getElementById(\'construction-story-03-video\');var title=document.getElementById(\'construction-story-03-title\');if(!iframe||!title||!window.Vimeo)return;var player=new Vimeo.Player(iframe);player.getVideoTitle().then(function(videoTitle){if(videoTitle)title.textContent=videoTitle;}).catch(function(){});})();</script>', '')
+          text = text.replace(' id="construction-story-03-video"', '')
+          text = text.replace(' id="construction-story-03-title"', '')
+
+          p.write_text(text)
+          print('Final titles:', titles)
+          PY
+      - name: Commit updated titles
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add construction-projects/index.html
+          git commit -m "Use actual Vimeo titles across construction portfolio"
+          git push
